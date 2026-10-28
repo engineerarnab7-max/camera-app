@@ -46,15 +46,12 @@ input[type=file]{font-size:12px;width:100%}
   <h1>Guided Photo Capture</h1>
   <div class="sub">Sample dekhe match hole auto capture hobe. Photo gulo tomar device e-i thake.</div>
 
-  <!-- SETUP -->
+  <!-- SETUP / LOADING -->
   <div id="setup" class="card">
-    <div class="stepname">Step 1: Sample ready</div>
-    <div class="hint">Neutral selfie 3 ta (alada alada angle/expression), pose 4 ta (up, left, down, right). Sample e mukh o shoulder clear thakte hobe.</div>
-    <div id="uploads"></div>
-    <div class="row">
-      <button id="btnAnalyze" disabled>Sample analyze kore shuru koro</button>
-    </div>
-    <div class="hint" id="setupStatus"></div>
+    <div class="stepname">Camera chalu hocche...</div>
+    <div class="hint" id="setupStatus">Ektu opekkha koro. Camera permission chaile Allow dao.</div>
+    <div id="uploads" class="hidden"></div>
+    <div class="row"><button id="btnAnalyze" class="hidden">Abar chesta koro</button></div>
   </div>
 
   <!-- CAPTURE -->
@@ -186,24 +183,25 @@ function visibilityOK(sig){
 }
 
 /* ============ ANALYZE SAMPLES ============ */
-$('btnAnalyze').onclick=async()=>{
+async function begin(){
   const st=$('setupStatus');st.textContent="Model load hocche (prothombar ektu somoy lagte pare)...";
-  $('btnAnalyze').disabled=true;
+  $('btnAnalyze').classList.add('hidden');
   try{
     const lmk=await loadLM();
     for(const s of STEPS.filter(s=>s.type==='sample')){
       const img=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=samples[s.key].url;});
       const res=lmk.detect(img);
-      const sig=signature(res,img.width,img.height);
-      if(!sig){st.textContent=`${s.label} er sample e mukh paoa jai ni. Onno chobi dao.`;$('btnAnalyze').disabled=false;return;}
-      samples[s.key].sig=sig;samples[s.key].img=img;
+      samples[s.key].sig=signature(res,img.width,img.height); // null hole ei step e auto-match hobe na
     }
     await lmk.setOptions({runningMode:"VIDEO"});
-    st.textContent="";
     $('setup').classList.add('hidden');$('capture').classList.remove('hidden');
     idx=firstPending();await startCam();gotoStep(idx);
-  }catch(e){st.textContent="Error: "+e.message;$('btnAnalyze').disabled=false;}
-};
+  }catch(e){
+    st.textContent="Error: "+e.message;
+    $('btnAnalyze').classList.remove('hidden');
+  }
+}
+$('btnAnalyze').onclick=begin;
 
 /* ============ CAMERA ============ */
 async function startCam(){
@@ -266,6 +264,7 @@ function loop(){
 
   if(s.type==='sample'){
     const t=samples[s.key].sig;
+    if(!t){fail("Ei sample theke auto-match hocche na. Sample moto pose kore 'Manual capture' chapo");return;}
     const dy=sig.yaw-t.yaw, dp=sig.pitch-t.pitch, dr=sig.roll-t.roll;
     // NOTE: mirrored preview: user-friendly directions computed on raw yaw
     if(Math.abs(dy)>T.yaw)problems.push(dy>0?"Aro bamdike ghurao":"Aro dandike ghurao");
@@ -365,6 +364,7 @@ $('btnReset').onclick=()=>{
   renderGallery();if(!$('capture').classList.contains('hidden'))gotoStep(0);
 };
 renderGallery();
+begin();
 </script>
 </body>
 </html>
